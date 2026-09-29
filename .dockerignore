@@ -1,0 +1,6 @@
+.git
+.env
+artifacts
+.local
+node_modules
+.venv

@@ -1,0 +1,84 @@
+name: uwugramm
+services:
+  db:
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: uwugramm
+      POSTGRES_DB: uwugramm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [database]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U uwugramm -d uwugramm"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+    security_opt: [no-new-privileges:true]
+
+  migrate:
+    build: ./backend
+    command: [alembic, upgrade, head]
+    env_file: ${UWUGRAMM_ENV_FILE:-.env}
+    environment:
+      DATABASE_URL: postgresql+psycopg://uwugramm:${POSTGRES_PASSWORD}@db:5432/uwugramm
+    depends_on:
+      db: {condition: service_healthy}
+    networks: [database]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    env_file: ${UWUGRAMM_ENV_FILE:-.env}
+    environment:
+      DATABASE_URL: postgresql+psycopg://uwugramm:${POSTGRES_PASSWORD}@db:5432/uwugramm
+      FORWARDED_ALLOW_IPS: 172.30.20.0/24
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    networks: [edge, database]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    cpus: 1.5
+    pids_limit: 80
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [edge]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    pids_limit: 40
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  edge:
+    ipam:
+      config: [{subnet: 172.30.20.0/24}]
+  database:
+    internal: true
+volumes:
+  postgres_data:

@@ -1,0 +1,154 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.12', '3.13']
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        with:
+          # renovate: datasource=pypi depName=uv
+          version: 0.10.9
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run --frozen pytest -q
+      - run: uv run --frozen mypy app
+      - run: uv run --frozen ruff check --config pyproject.toml app tests migrations ../scripts
+      - run: uv run --frozen ruff format --config pyproject.toml --check app tests migrations ../scripts
+      - run: uv run --frozen python -m unittest discover -s ../scripts/tests -v
+  frontend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run format:check
+      - run: npm run build
+  containers:
+    name: containers-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Build API candidate
+        uses: Hartmannlight/pipeline-toolkit/actions/build@80b764e99103422f49833e42d42a1111d8856788
+        with:
+          context: backend
+          file: backend/Dockerfile
+          platform: linux/${{ matrix.arch }}
+          image: candidate-api:gate
+      - name: Build web candidate
+        uses: Hartmannlight/pipeline-toolkit/actions/build@80b764e99103422f49833e42d42a1111d8856788
+        with:
+          context: frontend
+          file: frontend/Dockerfile
+          platform: linux/${{ matrix.arch }}
+          image: candidate-web:gate
+      - name: PostgreSQL and HTTP integration smoke
+        run: python3 scripts/container_smoke.py
+      - name: Scan API candidate
+        uses: Hartmannlight/pipeline-toolkit/actions/scan@80b764e99103422f49833e42d42a1111d8856788
+        with:
+          image: candidate-api:gate
+          output: artifacts/api
+      - name: Scan web candidate
+        uses: Hartmannlight/pipeline-toolkit/actions/scan@80b764e99103422f49833e42d42a1111d8856788
+        with:
+          image: candidate-web:gate
+          output: artifacts/web
+      - name: Save exactly the tested images
+        run: |
+          mkdir -p candidate/api candidate/web
+          docker save candidate-api:gate -o candidate/api/image.tar
+          docker save candidate-web:gate -o candidate/web/image.tar
+          cp artifacts/api/sbom.spdx.json candidate/api/
+          cp artifacts/web/sbom.spdx.json candidate/web/
+      - name: Upload tested candidates
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: candidate-${{ matrix.arch }}
+          path: candidate/
+          retention-days: 2
+          compression-level: 0
+      - name: Upload sanitized scan reports and smoke logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: container-reports-${{ matrix.arch }}
+          path: artifacts/
+          retention-days: 14
+  source-security:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Hartmannlight/pipeline-toolkit
+          ref: 80b764e99103422f49833e42d42a1111d8856788
+          path: .pipeline-toolkit
+          sparse-checkout: actions/scan
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567
+        with:
+          version: v0.74.0
+          cache: true
+      - name: Scan source dependencies and secrets
+        run: |
+          mkdir -p artifacts
+          trivy fs --scanners vuln,secret --include-dev-deps --format json --skip-dirs .git,.venv,node_modules,.pipeline-toolkit,artifacts --output "$RUNNER_TEMP/source-scan.json" .
+          python3 .pipeline-toolkit/actions/scan/gate.py "$RUNNER_TEMP/source-scan.json" artifacts/source-scan.json
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: source-security
+          path: artifacts/
+          retention-days: 14
+  ci-gate:
+    name: ci-gate
+    if: always()
+    needs: [backend, frontend, containers, source-security]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require all checks
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          results = json.loads(os.environ['RESULTS'])
+          failed = {name: job['result'] for name, job in results.items() if job['result'] != 'success'}
+          if failed:
+              raise SystemExit(f'CI gate failed: {failed}')
+          print('All tests, native container smoke tests and security gates passed')
+          PY

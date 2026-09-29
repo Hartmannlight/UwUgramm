@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["github>Hartmannlight/pipeline-toolkit"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)(Dockerfile|compose\\.yaml)$/"],
+      "matchStrings": ["# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+(?:ARG [A-Z_]+=|version: )(?<currentValue>[^\\s]+)"]
+    }
+  ]
+}
