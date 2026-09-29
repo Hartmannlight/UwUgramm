@@ -4,3 +4,11 @@ artifacts
 .local
 node_modules
 .venv
+**/node_modules
+**/.venv
+**/.local
+**/dist
+**/__pycache__
+**/test-results
+**/playwright-report
+**/public/python

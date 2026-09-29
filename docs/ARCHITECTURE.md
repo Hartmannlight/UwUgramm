@@ -30,6 +30,10 @@ beschrieben.
   und kurzlebige Rate-Limits. Ein modularer Monolith reicht; keine Microservices.
 - Docker Compose: statisches Frontend mit Nginx als Same-Origin-Proxy, API,
   Migration und PostgreSQL. TLS wird am vorhandenen Reverse Proxy terminiert.
+- Optionaler lokaler Build: Cloud-Funktionen und API-Zugriffe sind deaktiviert.
+  Der bestehende Python-Parser läuft mit Pyodide im Browser-Worker; Projekte und
+  Ordner werden lokal gespeichert. [Statisches Hosting](STATIC_HOSTING.md)
+  beschreibt GitHub Pages und den unabhängigen Web-Container ohne Datenbank.
 
 ## Tastaturmodell
 

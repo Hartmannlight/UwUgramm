@@ -1,5 +1,19 @@
 # Prüfergebnisse
 
+## Lokaler Modus und GitHub Pages – 30. September 2026
+
+- **Projektchecks:** 83 Backend-, 81 Frontend- und acht Release-Tests bestanden;
+  mypy, Ruff, Prettier, TypeScript und der Cloud-Produktionsbuild erfolgreich.
+- **Statischer Browser-Test:** Chromium prüft den Build unter `/UwUgramm/`:
+  fehlende Anmeldung/Freigabe, lokale Persistenz nach Reload, Python-Import,
+  Unicode und Typalias-Export, Download, Syntaxfehler mit erhaltenem Diagramm
+  sowie Python-Anweisungen ohne Ausführung. API- und fremde Requests sind blockiert.
+- **Workflows:** Alle Workflows einschließlich Pages mit actionlint geprüft.
+- **Statischer Container:** Produktionsimage gebaut und derselbe Browser-Test
+  gegen Nginx mit Sicherheitsheadern bestanden. Testcontainer ohne API und
+  Datenbank, mit schreibgeschütztem Dateisystem und entfernten Capabilities.
+
+
 ## Pipeline-Vorbereitung – 30. September 2026
 
 - **Lokale Prüfungen:** 83 Backend-, 78 Frontend- und acht Release-Tests bestanden;

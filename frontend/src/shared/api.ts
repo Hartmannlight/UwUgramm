@@ -1,3 +1,5 @@
+import { cloudEnabled } from "./config";
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -14,6 +16,12 @@ export async function api<T>(
   method = "GET",
   body?: unknown,
 ): Promise<T> {
+  if (!cloudEnabled) {
+    throw new ApiError(
+      "Cloud-Funktionen sind in dieser Instanz deaktiviert.",
+      0,
+    );
+  }
   let response: Response;
   try {
     response = await fetch("/api" + path, {

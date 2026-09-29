@@ -1237,10 +1237,15 @@ kbd {
   height: 112px;
   will-change: left, transform;
 }
+.local-mode-label {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
 .pet-sprite {
   width: 84px;
   height: 112px;
-  background-image: url("/pets-walk.png");
+  background-image: url("../../public/pets-walk.png");
   background-size: 400% 200%;
   background-repeat: no-repeat;
   animation: pet-steps 0.65s steps(1, end) infinite;

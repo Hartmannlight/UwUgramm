@@ -9,6 +9,10 @@ Google-Anmeldung, privaten Projekten und Freigaben per kurzem Code.
 CI, Sicherheitsprüfungen und AMD64-/ARM64-Releases sind in
 [docs/PIPELINES.md](docs/PIPELINES.md) dokumentiert.
 
+**Ohne Anmeldung direkt nutzen:** [UwUgramm auf GitHub Pages](https://hartmannlight.github.io/UwUgramm/).
+Diese Instanz arbeitet ausschließlich lokal im Browser. Für eine eigene Instanz
+ohne API und Datenbank siehe [statisches Hosting](docs/STATIC_HOSTING.md).
+
 ## Bedienung
 
 - **Sofort starten:** Ohne Anmeldung werden Projekte lokal in diesem Browser gespeichert.
