@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api } from "../../shared/api";
+import { fromPython } from "./conversion";
 import { toPython } from "../diagram/model";
 import type { Diagram } from "../diagram/model";
 export interface Conversion {
@@ -7,8 +7,7 @@ export interface Conversion {
   warnings: string[];
 }
 export type ParsePython = (source: string) => Promise<Conversion>;
-const parsePython: ParsePython = (source) =>
-  api("/convert/from-python", "POST", { source });
+const parsePython: ParsePython = fromPython;
 interface Buffer {
   source: string;
   base: Diagram;

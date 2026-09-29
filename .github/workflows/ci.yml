@@ -49,6 +49,49 @@ jobs:
       - run: npm test
       - run: npm run format:check
       - run: npm run build
+  static-site:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Test self-contained build in Chromium under a project subpath
+        run: npm run test:static
+      - name: Test the standalone container without API or database
+        run: |
+          docker build -f Dockerfile.static -t candidate-static:gate ..
+          trap 'docker rm -f uwugramm-static-smoke' EXIT
+          docker run -d --name uwugramm-static-smoke --read-only --tmpfs /tmp \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            -p 127.0.0.1:8098:8080 candidate-static:gate
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8098/ > /dev/null; then break; fi
+            sleep 1
+          done
+          STATIC_TEST_URL=http://127.0.0.1:8098/ npm run test:static
+      - name: Build deployable Pages candidate
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+        run: npm run build:static
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: static-site
+          path: frontend/dist/
+          retention-days: 2
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: static-browser-report
+          path: frontend/test-results/
+          retention-days: 7
   containers:
     name: containers-${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
@@ -137,7 +180,7 @@ jobs:
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [backend, frontend, containers, source-security]
+    needs: [backend, frontend, static-site, containers, source-security]
     runs-on: ubuntu-24.04
     steps:
       - name: Require all checks

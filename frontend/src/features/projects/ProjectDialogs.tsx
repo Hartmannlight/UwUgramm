@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check, Cloud, Copy, LogOut, Share2, Trash2 } from "lucide-react";
 import Modal from "../../shared/Modal";
 import { api } from "../../shared/api";
+import { cloudEnabled } from "../../shared/config";
 import type { Project } from "./model";
 import type { useWorkspace } from "./useWorkspace";
 export type Dialog =
@@ -54,6 +55,11 @@ export default function ProjectDialogs({
     </p>
   );
   if (!dialog) return null;
+  if (
+    !cloudEnabled &&
+    ["share", "copy", "account", "delete-account"].includes(dialog)
+  )
+    return null;
   if (dialog === "share")
     return (
       <Modal title="Projekt teilen" onClose={close}>

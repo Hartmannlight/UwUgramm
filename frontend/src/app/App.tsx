@@ -62,7 +62,9 @@ import {
   moveTo,
 } from "../features/diagram/editing";
 import type { Position } from "../features/diagram/editing";
-import { api, download } from "../shared/api";
+import { download } from "../shared/api";
+import { cloudEnabled } from "../shared/config";
+import { exportPython as convertToPython } from "../features/python/conversion";
 import { useWorkspace } from "../features/projects/useWorkspace";
 import { usePythonSync } from "../features/python/usePythonSync";
 import { useCanvasZoom } from "../features/diagram/useCanvasZoom";
@@ -305,11 +307,7 @@ export default function App() {
     }
     setBusy(true);
     try {
-      const result = await api<{ source: string }>(
-        "/convert/to-python",
-        "POST",
-        w.active.document,
-      );
+      const result = await convertToPython(w.active.document);
       download(w.active.title + ".py", result.source, "text/x-python");
     } catch (err) {
       notify((err as Error).message);
@@ -531,14 +529,16 @@ export default function App() {
               <CheckCheck size={18} />
             )}
           </button>
-          <button
-            className="toolbar-button"
-            disabled={sync.locked}
-            onClick={() => setDialog("share")}
-          >
-            <Share2 size={16} />
-            <span>Teilen</span>
-          </button>
+          {cloudEnabled && (
+            <button
+              className="toolbar-button"
+              disabled={sync.locked}
+              onClick={() => setDialog("share")}
+            >
+              <Share2 size={16} />
+              <span>Teilen</span>
+            </button>
+          )}
           <div className="theme-switch" aria-label="Darstellung">
             <button
               aria-label="Helles Theme"
@@ -578,22 +578,26 @@ export default function App() {
               {moving ? <Pause size={16} /> : <Play size={16} />}
             </button>
           )}
-          <button
-            className="account-button"
-            aria-label={
-              w.session.authenticated ? "Konto öffnen" : "Mit Google anmelden"
-            }
-            onClick={() => setDialog("account")}
-          >
-            {w.session.authenticated ? (
-              <span className="avatar">U</span>
-            ) : (
-              <>
-                <span className="google-g">G</span>
-                <span>Anmelden</span>
-              </>
-            )}
-          </button>
+          {cloudEnabled ? (
+            <button
+              className="account-button"
+              aria-label={
+                w.session.authenticated ? "Konto öffnen" : "Mit Google anmelden"
+              }
+              onClick={() => setDialog("account")}
+            >
+              {w.session.authenticated ? (
+                <span className="avatar">U</span>
+              ) : (
+                <>
+                  <span className="google-g">G</span>
+                  <span>Anmelden</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <span className="local-mode-label">Nur lokal</span>
+          )}
         </div>
       </header>
       <div className="workspace-body">
@@ -620,10 +624,12 @@ export default function App() {
               if (matchMedia("(max-width: 1000px)").matches) setSideOpen(false);
             }}
           />
-          <button className="subtle-button" onClick={() => setDialog("copy")}>
-            <Share2 size={15} />
-            Code einlösen
-          </button>
+          {cloudEnabled && (
+            <button className="subtle-button" onClick={() => setDialog("copy")}>
+              <Share2 size={15} />
+              Code einlösen
+            </button>
+          )}
           <div className="sidebar-rule" />
           <div className="section-label">Bausteine</div>
           <div className="block-palette">

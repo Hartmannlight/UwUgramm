@@ -13,6 +13,8 @@ Pull Requests auf `main`, manuelle CI-Läufe und die Release-Pipeline führen
 
 - Backend: Python 3.12 und 3.13, unveränderte uv-Lockdatei, pytest, mypy, Ruff.
 - Frontend: Node 24, `npm ci`, Vitest, Prettier, TypeScript und Vite-Build.
+- Statische Instanz: Browser-Test ohne API oder externe Requests unter einem
+  Pages-Unterpfad, danach statischer Build als Deployment-Artefakt.
 - Container: native AMD64- und ARM64-Runner bauen API und Web. Ein temporärer
   Compose-Stack prüft PostgreSQL-Migrationen, statische Assets, HTTP-Sicherheitsheader,
   Unicode-Konvertierung, Authentifizierung, CRUD und optimistische Versionskonflikte.
@@ -70,3 +72,7 @@ Renovate übernimmt die gemeinsamen Update-Regeln aus `pipeline-toolkit` für
 Actions, Images, Python-/npm-Abhängigkeiten und Lockdateien. Die Renovate-App muss
 für dieses Repo freigeschaltet sein. Anwendung und Compose-Datei pinnen direkte
 Python-Abhängigkeiten bzw. Images; Updates werden über CI geprüft.
+
+Nach einem erfolgreichen Container-Release auf dem aktuellen `main` veröffentlicht
+der Pages-Workflow zusätzlich den bereits getesteten statischen Build. Die Website
+benötigt die Container nicht. Details: [STATIC_HOSTING.md](STATIC_HOSTING.md).

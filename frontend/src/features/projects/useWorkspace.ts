@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { api, setCsrf } from "../../shared/api";
+import { cloudEnabled } from "../../shared/config";
 import { LOCAL_PROJECT_LIMIT, makeProject } from "./model";
 import { validDiagram } from "../diagram/model";
 import type { Project, ProjectFolder } from "./model";
@@ -52,6 +53,7 @@ export function useWorkspace(notify: (text: string) => void) {
   const active = projects.find((p) => p.id === activeId) || projects[0];
 
   useEffect(() => {
+    if (!cloudEnabled) return;
     let cancelled = false;
     const epoch = authEpoch.current;
     api<Session>("/session")
@@ -132,6 +134,20 @@ export function useWorkspace(notify: (text: string) => void) {
         (p) => p.id === (targetId || activeId),
       );
       if (!project || inFlight.current.size > 0) return undefined;
+      if (!cloudEnabled) {
+        try {
+          writeProjects(latest.current);
+          writeFolders(latestFolders.current, latest.current);
+          setSaveState("Lokal gespeichert");
+          notify("Lokal gespeichert.");
+        } catch {
+          setSaveState("Browser-Speicher voll · bitte exportieren");
+          notify(
+            "Speichern im Browser fehlgeschlagen. Bitte exportiere eine Kopie.",
+          );
+        }
+        return;
+      }
       if (!session.authenticated) {
         notify(
           "Lokal gespeichert. Mit Google kannst du zusätzlich in der Cloud speichern.",
