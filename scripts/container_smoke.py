@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import re
 import secrets
 import subprocess
@@ -27,6 +28,13 @@ def main():
         "IDENTITY_KEY": secrets.token_hex(32),
         "DATABASE_URL": f"postgresql+psycopg://uwugramm:{password}@db:5432/uwugramm",
     }
+    # The temporary Compose file contains only placeholders, never test secrets.
+    compose_environment = {key: "${SMOKE_" + key + ":?}" for key in environment}
+    process_environment = {
+        **os.environ,
+        **{"SMOKE_" + key: value for key, value in environment.items()},
+        "SMOKE_POSTGRES_PASSWORD": password,
+    }
     restricted = {
         "read_only": True,
         "tmpfs": ["/tmp"],
@@ -36,7 +44,7 @@ def main():
     api = {
         **restricted,
         "image": args.api,
-        "environment": environment,
+        "environment": compose_environment,
         "depends_on": {"migrate": {"condition": "service_completed_successfully"}},
         "healthcheck": {
             "test": [
@@ -57,7 +65,7 @@ def main():
                 "environment": {
                     "POSTGRES_USER": "uwugramm",
                     "POSTGRES_DB": "uwugramm",
-                    "POSTGRES_PASSWORD": password,
+                    "POSTGRES_PASSWORD": "${SMOKE_POSTGRES_PASSWORD:?}",
                 },
                 "volumes": ["data:/var/lib/postgresql/data"],
                 "healthcheck": {
@@ -70,7 +78,7 @@ def main():
             "migrate": {
                 **restricted,
                 "image": args.api,
-                "environment": environment,
+                "environment": compose_environment,
                 "command": ["alembic", "upgrade", "head"],
                 "depends_on": {"db": {"condition": "service_healthy"}},
             },
@@ -107,7 +115,7 @@ def main():
 
         def run(*command):
             return subprocess.check_output(
-                [*compose, *command], text=True, encoding="utf-8", timeout=240
+                [*compose, *command], text=True, encoding="utf-8", timeout=240, env=process_environment
             ).strip()
 
         try:
@@ -194,6 +202,7 @@ asyncio.run(seed())
                 text=True,
                 encoding="utf-8",
                 timeout=30,
+                env=process_environment,
             )
             sanitized = logs.stdout
             for secret in (
@@ -207,6 +216,7 @@ asyncio.run(seed())
                 [*compose, "down", "--volumes", "--remove-orphans"],
                 check=True,
                 timeout=90,
+                env=process_environment,
             )
 
 
