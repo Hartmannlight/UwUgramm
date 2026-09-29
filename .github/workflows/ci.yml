@@ -28,7 +28,7 @@ jobs:
           python-version: ${{ matrix.python }}
           enable-cache: true
       - run: uv sync --locked
-      - run: uv run --frozen pytest -q
+      - run: uv run --frozen python -m pytest -q
       - run: uv run --frozen mypy app
       - run: uv run --frozen ruff check --config pyproject.toml app tests migrations ../scripts
       - run: uv run --frozen ruff format --config pyproject.toml --check app tests migrations ../scripts
